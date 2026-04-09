@@ -1,0 +1,5 @@
+Databricks is a unified data analytics platform used for big data and machine learning.
+It allows data engineers to process large datasets efficiently.
+PySpark is used for distributed data processing across clusters.
+Delta Lake enables reliable data lakes with ACID transactions.
+It helps in building scalable data pipelines and analytics solutions.
