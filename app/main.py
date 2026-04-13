@@ -1,102 +1,49 @@
-print("Running full RAG system...")
-
-from langchain_community.document_loaders import TextLoader
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-from sentence_transformers import SentenceTransformer
-from transformers import pipeline
-import faiss
-import numpy as np
+from fastapi import FastAPI, HTTPException
+from app.models import QueryRequest, QueryResponse
+from app.rag_pipeline import get_answer
+import logging
 
 # -----------------------------
-# 1. Load document
+# Logging setup
 # -----------------------------
-loader = TextLoader("app/sample.txt")
-documents = loader.load()
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # -----------------------------
-# 2. Split into chunks
+# FastAPI app
 # -----------------------------
-text_splitter = RecursiveCharacterTextSplitter(
-    chunk_size=100,
-    chunk_overlap=20
-)
-
-chunks = text_splitter.split_documents(documents)
-chunk_texts = [chunk.page_content for chunk in chunks]
-
-# -----------------------------
-# 3. Create embeddings
-# -----------------------------
-embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
-embeddings = embedding_model.encode(chunk_texts)
-
-# -----------------------------
-# 4. Store in FAISS
-# -----------------------------
-dimension = embeddings.shape[1]
-index = faiss.IndexFlatL2(dimension)
-index.add(np.array(embeddings))
-
-# -----------------------------
-# 5. User query
-# -----------------------------
-query = "What is PySpark?"
-query_vector = embedding_model.encode([query])
-
-# -----------------------------
-# 6. Retrieve relevant chunks
-# -----------------------------
-k = 2
-distances, indices = index.search(np.array(query_vector), k)
-retrieved_chunks = [chunk_texts[i] for i in indices[0]]
-
-# -----------------------------
-# 7. Prepare prompt (IMPROVED)
-# -----------------------------
-context = " ".join(retrieved_chunks)
-
-prompt = f"""
-You are a helpful AI assistant.
-
-Answer the question clearly in 1-2 sentences.
-
-Context:
-{context}
-
-Question: {query}
-
-Answer:
-"""
-
-# -----------------------------
-# 8. Generate response (IMPROVED)
-# -----------------------------
-generator = pipeline("text-generation", model="distilgpt2")
-
-response = generator(
-    prompt,
-    max_new_tokens=60,
-    do_sample=True,
-    temperature=0.3
+app = FastAPI(
+    title="RAG Chat System API",
+    description="Production-ready GenAI API using RAG pipeline",
+    version="1.0.0"
 )
 
 # -----------------------------
-# 9. Clean output (FINAL FIX)
+# Health check
 # -----------------------------
-output = response[0]['generated_text']
+@app.get("/")
+def health_check():
+    return {"status": "ok", "message": "RAG API is running"}
 
-# Extract answer part
-if "Answer:" in output:
-    final_answer = output.split("Answer:")[-1].strip()
-else:
-    final_answer = output.strip()
 
-# Remove repeated junk
-final_answer = final_answer.split("Question")[0].strip()
+# -----------------------------
+# Query endpoint
+# -----------------------------
+@app.post("/query", response_model=QueryResponse)
+def query_rag(request: QueryRequest):
+    try:
+        logger.info(f"Received query: {request.question}")
 
-# Fallback if empty
-if len(final_answer) < 5:
-    final_answer = "PySpark is a distributed data processing framework used for handling large-scale data across clusters."
+        if not request.question.strip():
+            raise ValueError("Question cannot be empty")
 
-print("\nFinal Answer:\n")
-print(final_answer)
+        answer = get_answer(request.question)
+
+        return QueryResponse(answer=answer)
+
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+
+    except Exception as e:
+        logger.error(f"Error occurred: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal Server Error")
