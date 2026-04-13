@@ -6,3 +6,5 @@ class QueryRequest(BaseModel):
 
 class QueryResponse(BaseModel):
     answer: str
+    source_chunks: list[str]
+    latency_ms: float

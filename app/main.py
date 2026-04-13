@@ -4,7 +4,7 @@ from app.rag_pipeline import get_answer
 import logging
 
 # -----------------------------
-# Logging setup
+# Logging
 # -----------------------------
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -37,9 +37,13 @@ def query_rag(request: QueryRequest):
         if not request.question.strip():
             raise ValueError("Question cannot be empty")
 
-        answer = get_answer(request.question)
+        result = get_answer(request.question)
 
-        return QueryResponse(answer=answer)
+        return QueryResponse(
+            answer=result["answer"],
+            source_chunks=result["sources"],
+            latency_ms=result["latency"]
+        )
 
     except ValueError as ve:
         raise HTTPException(status_code=400, detail=str(ve))

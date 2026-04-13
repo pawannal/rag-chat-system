@@ -1,12 +1,22 @@
 from langchain_community.document_loaders import TextLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from sentence_transformers import SentenceTransformer
-from transformers import pipeline
 import faiss
 import numpy as np
 
+import os
+import time
+from openai import OpenAI
+from dotenv import load_dotenv
+
 # -----------------------------
-# Load and prepare once (IMPORTANT)
+# Load environment variables
+# -----------------------------
+load_dotenv()
+client = OpenAI()   # reads API key from .env
+
+# -----------------------------
+# Load and prepare data (runs once)
 # -----------------------------
 loader = TextLoader("app/sample.txt")
 documents = loader.load()
@@ -19,60 +29,76 @@ text_splitter = RecursiveCharacterTextSplitter(
 chunks = text_splitter.split_documents(documents)
 chunk_texts = [chunk.page_content for chunk in chunks]
 
+# -----------------------------
+# Create embeddings
+# -----------------------------
 embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
 embeddings = embedding_model.encode(chunk_texts)
 
+# -----------------------------
+# Store in FAISS
+# -----------------------------
 dimension = embeddings.shape[1]
 index = faiss.IndexFlatL2(dimension)
 index.add(np.array(embeddings))
-
-generator = pipeline("text-generation", model="distilgpt2")
 
 
 # -----------------------------
 # MAIN FUNCTION
 # -----------------------------
-def get_answer(query: str) -> str:
+def get_answer(query: str) -> dict:
+    start_time = time.time()
+
+    # Convert query to embedding
     query_vector = embedding_model.encode([query])
 
+    # Retrieve top-k chunks
     k = 2
     distances, indices = index.search(np.array(query_vector), k)
-
     retrieved_chunks = [chunk_texts[i] for i in indices[0]]
+
     context = " ".join(retrieved_chunks)
 
-    prompt = f"""
+    try:
+        # -----------------------------
+        # OpenAI LLM call (IMPROVED PROMPT)
+        # -----------------------------
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {
+                    "role": "user",
+                    "content": f"""
 You are a helpful AI assistant.
 
-Answer the question clearly in 1-2 sentences.
+Answer clearly in 1-2 sentences.
+Be precise and avoid repetition.
+Use only the given context.
 
 Context:
 {context}
 
 Question: {query}
-
-Answer:
 """
+                }
+            ],
+            temperature=0.2,
+            max_tokens=100
+        )
 
-    response = generator(
-        prompt,
-        max_new_tokens=60,
-        do_sample=True,
-        temperature=0.3
-    )
+        final_answer = response.choices[0].message.content.strip()
 
-    output = response[0]['generated_text']
+    except Exception as e:
+        print("LLM ERROR:", str(e))
+        final_answer = "Error generating response from LLM"
 
-    # Clean output
-    if "Answer:" in output:
-        final_answer = output.split("Answer:")[-1].strip()
-    else:
-        final_answer = output.strip()
+    latency = (time.time() - start_time) * 1000
 
-    final_answer = final_answer.split("Question")[0].strip()
-
-    # Fallback
-    if len(final_answer) < 5:
-        final_answer = "PySpark is a distributed data processing framework used for handling large-scale data across clusters."
-
-    return final_answer
+    # -----------------------------
+    # FINAL RETURN
+    # -----------------------------
+    return {
+        "answer": final_answer,
+        "sources": retrieved_chunks,
+        "latency": latency
+    }
