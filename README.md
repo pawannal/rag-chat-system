@@ -1,27 +1,58 @@
-# 🚀 RAG Chat System
+# 🚀 RAG Chat System (FastAPI + FAISS + OpenAI)
 
-A production-ready Retrieval-Augmented Generation (RAG) system built using FastAPI and OpenAI.
-
----
-
-## 🔹 Features
-
-- Context-aware Q&A using FAISS vector search  
-- OpenAI integration for high-quality responses  
-- Source attribution for transparency  
-- Latency tracking for performance monitoring  
-- Clean API with request/response validation  
+![Python](https://img.shields.io/badge/Python-3.10-blue)
+![FastAPI](https://img.shields.io/badge/FastAPI-Backend-green)
+![LangChain](https://img.shields.io/badge/LangChain-RAG-orange)
+![FAISS](https://img.shields.io/badge/VectorDB-FAISS-red)
+![OpenAI](https://img.shields.io/badge/OpenAI-LLM-black)
 
 ---
 
-## 🔹 Tech Stack
+## 🔥 Overview
+This project implements a Retrieval-Augmented Generation (RAG) system that enables context-aware question answering over custom documents.
+
+Instead of relying solely on LLM knowledge, the system retrieves relevant document chunks using FAISS and generates grounded responses using OpenAI.
+
+---
+
+## 🏗️ Architecture
+
+![Architecture](./app/assets/project1.jpeg)
+
+### 🔄 Flow
+User → FastAPI → Query Embedding → FAISS Retrieval → Context Injection → LLM → Response
+
+---
+
+## 🚀 Features
+
+- 📄 Document ingestion & chunking  
+- 🔍 Semantic search using FAISS vector database  
+- 🧠 Context-aware response generation  
+- 📌 Source attribution (grounded answers)  
+- ⚡ Latency tracking for performance monitoring  
+- 🔗 FastAPI-based REST API  
+
+---
+
+## 🛠 Tech Stack
 
 - Python  
 - FastAPI  
 - LangChain  
-- FAISS  
-- OpenAI API  
+- FAISS (Vector Database)  
+- OpenAI  
+- Pydantic  
 
 ---
 
-## 🔹 Project Structure
+## ⚙️ Setup
+
+```bash
+git clone https://github.com/pawannal/rag-chat-system.git
+cd rag-chat-system
+
+python -m venv venv
+source venv/bin/activate
+
+pip install -r requirements.txt
